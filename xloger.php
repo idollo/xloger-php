@@ -5,16 +5,16 @@
  * 
  * 使用方法
  * // log 数据
- * Console::log( $data );
+ * XLoger::log( $data );
  * 
  * // 警告信息
- * Console::warning( "warning_message" , $somedata=[] );
+ * XLoger::warning( "warning_message" , $somedata=[] );
  * 
  * // 错误信息
- * Console::error( "error_message", $somedata=[] );
+ * XLoger::error( "error_message", $somedata=[] );
  * 
  * // 异常信息
- * Console::exception( new Exception("error message") );
+ * XLoger::exception( new Exception("error message") );
  */
 
 # -------------------------------------
@@ -42,10 +42,8 @@ if(file_exists( $console_config_file  )){
  */
 
 # Redis 配置
-if(!defined("XLOGER_REDIS_HOST")){ define("XLOGER_REDIS_HOST", "ConsoleRedisServer"); }
-if(!defined("XLOGER_REDIS_PORT")){ define("XLOGER_REDIS_PORT", 6379 ); }
-if(!defined("XLOGER_REDIS_DATABASE")){ define("XLOGER_REDIS_DATABASE", 0); }
-if(!defined("XLOGER_REDIS_CONFIG_NAME")){ define("XLOGER_REDIS_CONFIG_NAME", "console_watcher_config" ); }
+if(!defined("XLOGER_SOCKET_ADDRESS")){ define("XLOGER_SOCKET_ADDRESS", "127.0.0.1"); }
+if(!defined("XLOGER_SOCKET_PORT")){ define("XLOGER_SOCKET_PORT", 19527 ); }
 
 # 服务器 IP
 if(!defined("XLOGER_CURRENT_SERVER_IP")){ define("XLOGER_CURRENT_SERVER_IP","127.0.0.1"); }
@@ -65,7 +63,7 @@ if(!defined("XLOGER_DISPLAY_ERRORS")){
 }
 
 # 自定义监控信息 ::log()  ::warning()  ::error()
-# 关闭所有 Console::$TRACE_LOG = XLOGER_CUSTOM_NONE;
+# 关闭所有 XLoger::$TRACE_LOG = XLOGER_CUSTOM_NONE;
 if(!defined("XLOGER_TRACE_LOG")){
 	define("XLOGER_TRACE_LOG", XLOGER_CUSTOM_ALL );
 }
@@ -84,7 +82,7 @@ if(!defined("XLOGER_ALWAYS_TRACE_LOG")){
  * @param mixed default - The variable instead of unset var.
  * @return mixed - &var if var is seted, default otherwish.
  */
-function console_set_def(&$var, $default = null) {
+function xloger_set_def(&$var, $default = null) {
 	if (! isset( $var )) return $default;
 	return $var;
 }
@@ -100,16 +98,16 @@ class XLoger {
 	const C_ERROR = 4;
 	const C_ALL = 7;
 
-	static $helper;
 	static $SERVER;
 	static $args;
 
 	static $TRACE_LOG = XLOGER_TRACE_LOG;
 	static $TRACE_ERROR = XLOGER_TRACE_ERROR;
+	static $helper;
 
-	public static function _init(){
+	public static function __init(){
+		self::$helper = new XLogerHelper();
 		self::$SERVER = isset($_SERVER)?$_SERVER:array();
-		self::$helper = new ConsoleHelper;
 	}
 
 	// log
@@ -131,13 +129,6 @@ class XLoger {
 		return self::$helper->error($msg, $data);
 	}
 
-	
-
-	// exception
-	public static function exception($exception){
-		return self::$helper->exception($exception);
-	}
-
 	public static function trace($type, $data=array()){
 		return self::$helper->trace($type, $data);
 	}
@@ -147,16 +138,18 @@ class XLoger {
 		return self::$helper->thread();
 	}
 	// create a SqlQueryTrace
-	public static function sqlTrace($query, $note=""){
-		return self::$helper->sqlTrace($query, $note);
+	public static function sql($query, $note=""){
+		return self::$helper->sql($query, $note);
 	}
 
 	public static function shellArgs($args){
 		self::$args = $args;
 	}
 
-
-
+	// get the server variable
+	public static function s($name, $default){
+		return xloger_set_def(XLoger::$SERVER[$name], $default );
+	}
 	/**
 	 * 致命错误
 	 */
@@ -234,23 +227,18 @@ class XLoger {
 	 * 异常捕获
 	 */
 	public static function exception_handler($exception){
-		Console::exception( $exception );
+		XLoger::exception( $exception );
 	}
 }
 
 
 /**
- * ConsoleHelper
+ * XLogerHelper
  */
-class ConsoleHelper {
-
+class XLogerHelper {
 	private $_thread;	// 线程信息
-
-	private $_gearman_client;
-
 	private $_client_ip;
 	private $_host;
-
 	private $_watched;
 	private $_redis;
 	private $_config;
@@ -259,27 +247,46 @@ class ConsoleHelper {
 	public $destructTime;	// 页面结束时间
 
 	public function __construct(){
-		// redis connection
-		$this->_redis = new \Redis;
-
-		if(!$this->_redis->connect( XLOGER_REDIS_HOST, XLOGER_REDIS_PORT ) || !$this->_redis->select(XLOGER_REDIS_DATABASE)){ return; }
-		
-		// 读取配置信息
-		$config = $this->_redis->get( XLOGER_REDIS_CONFIG_NAME );
-		if($config){
-			$config = json_decode($config, true);
+		// 线程ID参数
+		$this->_thread = $this->createThreadID();
+		$headers = function_exists("getallheaders")? getallheaders() : array();
+		if(isset($headers["xloger-thread"])){
+			$super_thread = $headers["xloger-thread"];
 		}else{
-			$config = array(
-				"filters" => array(),
-				"reportServers" => array()
-			);
+			$super_thread =  isset($_REQUEST['xloger_thread'])?$_REQUEST['xloger_thread'] : null;
 		}
-		$this->_config = $config;
-
+		if($super_thread){
+			$this->_thread = $super_thread."_".$this->_thread;
+		}
 		// HttpHost
-		$this->_host = console_set_def(Console::$SERVER["HTTP_HOST"], "PHPScript: " );
+		$this->_host = XLoger::s("HTTP_HOST", "PHPScript: ");
 		// 客户端IP
 		$this->_client_ip = $this->clientIP();
+		$config = array(
+			"filters" => array(),
+			"reportServers" => array()
+		);
+		$handshake_data = null;
+
+		// socket connection
+		$socket = self::socket();
+		if($socket !== false){
+			$threaddata =  $this->_threadData();
+			// unset postData, 避免大量数据
+			unset($threaddata["postData"]);
+			$this->publish("checkin", $this->_threadData() );
+			$handshake_data = socket_read( $socket , 1024*1024 , PHP_NORMAL_READ );
+			$handshake_data = json_decode( $handshake_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR  );
+		}
+
+
+		// 读取配置信息
+		if(is_array($handshake_data)){
+			$config = array_merge_recursive($config, $handshake_data);
+		}
+
+		$this->_config = $config;
+		
 
 
 		// 如果未注册服务器, 则注册服务器IP
@@ -289,36 +296,23 @@ class ConsoleHelper {
 			$host_reged = in_array($this->_host, $config["reportServers"][XLOGER_CURRENT_SERVER_IP]['hosts']);
 		}
 		if(!$ip_reged || !$host_reged){
-			$this->_redis->publish("console-server-reg", json_encode(array(
+			$this->publish("register", array(
 				"ip" => XLOGER_CURRENT_SERVER_IP,
 				"host" => $this->_host
-			), JSON_UNESCAPED_UNICODE));
-		}
-		
-
-		// 线程ID参数
-		$this->_thread = $this->createThreadID();
-		$headers = function_exists("getallheaders")? getallheaders() : array();
-		if(isset($headers["console-thread"])){
-			$super_thread = $headers["console-thread"];
-		}else{
-			$super_thread =  isset($_REQUEST['console_thread'])?$_REQUEST['console_thread'] : null;
-		}
-		if($super_thread){
-			$this->_thread = $super_thread."_".$this->_thread;
+			));
 		}
 
 		// 开始时间
-		$this->requestTime =  console_set_def(Console::$SERVER['REQUEST_TIME_FLOAT'], microtime(true) );
+		$this->requestTime =  xloger_set_def(XLoger::$SERVER['REQUEST_TIME_FLOAT'], microtime(true) );
 
 		// 报告错误日志
-		if(false && XLOGER_CUSTOM_ERROR & Console::$TRACE_LOG){  
+		if(XLOGER_CUSTOM_ERROR & XLoger::$TRACE_LOG){  
 			// 致命错误
-			register_shutdown_function( array("Console", "fatal_handler") );
+			register_shutdown_function( array("XLoger", "fatal_handler") );
 			// 捕获错误
-			set_error_handler( array('Console','error_handler') );
+			set_error_handler( array('XLoger','error_handler') );
 			// 自动捕获异常
-			set_exception_handler( array('Console','exception_handler') );
+			set_exception_handler( array('XLoger','exception_handler') );
 		}
 		// 是否监控线程
 		if(!$this->applyFilter()) {
@@ -345,18 +339,18 @@ class ConsoleHelper {
 		if(!XLOGER_TRACE_THREAD) return false;
 		// 线程筛选
 		$threads = explode("_", $this->_thread);
-		$keys = array();
-		foreach ($threads as $i => $t) {
-			$keys[] = "console_thread:".implode("_", array_slice($threads, 0, $i+1) );
-		}
-		$exists = $this->_redis->mGet($keys);
-		foreach ($exists as $e) {
-			if($e){ // 输出子进程
-				$this->_watched = true;
-				return true; 
-			}
-		}
-
+		// $keys = array();
+		// foreach ($threads as $i => $t) {
+		// 	$keys[] = "xloger_thread:".implode("_", array_slice($threads, 0, $i+1) );
+		// }
+		// $exists = $this->_redis->mGet($keys);
+		// foreach ($exists as $e) {
+		// 	if($e){ // 输出子进程
+		// 		$this->_watched = true;
+		// 		return true; 
+		// 	}
+		// }
+		$this->_watched = true;
 
 		// 条件筛选
 		foreach ($this->_config["filters"] as $filter) {
@@ -387,17 +381,17 @@ class ConsoleHelper {
 						}
 						break;
 					case "useragent":
-						$ua = console_set_def(Console::$SERVER["HTTP_USER_AGENT"], "unknown");
+						$ua = xloger_set_def(XLoger::$SERVER["HTTP_USER_AGENT"], "unknown");
 						if( !preg_match("/{$exp}/i", $ua) ) $pass=false;
 						break;
 
 					case "httpmethod":
-						$method = console_set_def(Console::$SERVER["REQUEST_METHOD"], "unknown");
+						$method = xloger_set_def(XLoger::$SERVER["REQUEST_METHOD"], "unknown");
 						if( !preg_match("/{$exp}/i", $method) ) $pass=false;
 						break;
 
 					case "requesturi":
-						$uri = console_set_def(Console::$SERVER["REQUEST_URI"], "unknown");
+						$uri = xloger_set_def(XLoger::$SERVER["REQUEST_URI"], "unknown");
 						if( !preg_match("/{$exp}/i", $uri) ) $pass=false;
 						break;
 
@@ -418,7 +412,7 @@ class ConsoleHelper {
 	 */
 	public function log(){
 		if(!XLOGER_ALWAYS_TRACE_LOG && !$this->_watched) return;
-		if(!(Console::$TRACE_LOG & XLOGER_CUSTOM_LOG) ) return;
+		if(!(XLoger::$TRACE_LOG & XLOGER_CUSTOM_LOG) ) return;
 		return $this->trace( "log", $this->_pitchBacktrace(debug_backtrace()) );
 	}
 
@@ -430,7 +424,7 @@ class ConsoleHelper {
 	 * 自定义警告
 	 */
 	public function warning(){
-		if( !(Console::$TRACE_LOG & XLOGER_CUSTOM_WARNING) ) return;
+		if( !(XLoger::$TRACE_LOG & XLOGER_CUSTOM_WARNING) ) return;
 		return $this->trace( "cwarning", $this->_pitchBacktrace( debug_backtrace()) );
 	}
 
@@ -438,23 +432,23 @@ class ConsoleHelper {
 	 * 自定义错误
 	 */
 	public function error($msg, $data=array()){
-		if( !(Console::$TRACE_LOG & XLOGER_CUSTOM_ERROR) ) return;
+		if( !(XLoger::$TRACE_LOG & XLOGER_CUSTOM_ERROR) ) return;
 		return $this->trace( "cerror", $this->_pitchBacktrace( debug_backtrace()) );
 	}
 
 	/**
 	 * 创建SqlQuery Trace
 	 */
-	public function sqlTrace($query, $note=""){
-		if(!$this->_watched || !(Console::$TRACE_LOG & XLOGER_CUSTOM_SQL)){
-			return new ConsoleSqlQueryTrace("", "", null );
+	public function sql($query, $note=""){
+		if(!$this->_watched || !(XLoger::$TRACE_LOG & XLOGER_CUSTOM_SQL)){
+			return new XLogerSqlQueryTrace("", "", null );
 		}
 		$backtrace = $this->_pitchBacktrace( debug_backtrace());
-		return new ConsoleSqlQueryTrace($query, $note, $backtrace );
+		return new XLogerSqlQueryTrace($query, $note, $backtrace );
 	}
 
 	public function traceSql($sqltrace){
-		if( !(Console::$TRACE_LOG & XLOGER_CUSTOM_SQL) || !$sqltrace instanceof ConsoleSqlQueryTrace){return;}
+		if( !(XLoger::$TRACE_LOG & XLOGER_CUSTOM_SQL) || !$sqltrace instanceof XLogerSqlQueryTrace){return;}
 		if(!$this->_watched) return; 
 		$data = $sqltrace->traceData();
 		if($data['error']){
@@ -471,7 +465,7 @@ class ConsoleHelper {
 	private function _pitchBacktrace($backtrace){
 		$point = array_splice($backtrace, 0, 1)[0];
 		foreach($backtrace as $t){
-			if($t["class"]=="Console"){
+			if(strtolower($t["class"])=="xloger"){
 				$point = $t;
 				break;
 			}
@@ -479,59 +473,56 @@ class ConsoleHelper {
 		$data = array(
 			"file" => $point["file"],
 			"line" => $point["line"],
-			"message" => console_set_def($point["args"][0],"no-message"),
+			"message" => xloger_set_def($point["args"][0],"no-message"),
 			"args" => $point["args"]
 		);
 		return $data;
 	}
 
-	/**
-	 * trace 错误
-	 * @param Exception $e, 错误对象 
-	 */
-	public function exception($e){
-		// class Exception ...
-		// final function getMessage(); // 返回异常信息
-		// final function getCode(); // 返回异常代码
-		// final function getFile(); // 返回发生异常的文件名
-		// final function getLine(); // 返回发生异常的代码行号
-		// final function getTrace(); // backtrace() 数组
-		// final function getTraceAsString(); // 已格成化成字符串的 getTrace() 信息 
-		return $this->trace("error", array(
-			"message"=> $e->getMessage(),
-			"code" => $e->getCode(),
-			"file" => $e->getFile(),
-			"line" => $e->getLine(),
-			"traceback" => json_encode($e->getTrace())
-		));
-	}
 
 	/**
 	 * 获取客户端IP
 	 */
 	public function clientIP(){
 	    $unk = "unknown";
+	    // customize clientip function
+	    if( function_exists("xloger_client_ip")){
+	    	return xloger_client_ip();
+	    }
 
 	    // 已声明的Client IP
-    	$cip = console_set_def(Console::$SERVER["HTTP_CLIENT_IP"],null);
+    	$cip = xloger_set_def(XLoger::$SERVER["HTTP_CLIENT_IP"],null);
     	if( $cip && strcasecmp($cip, $unk)){ return $cip; }
 	    
 	    // 代理服务器转发
-    	$hxff = console_set_def(Console::$SERVER["HTTP_X_FORWARDED_FOR"],null);
+    	$hxff = xloger_set_def(XLoger::$SERVER["HTTP_X_FORWARDED_FOR"],null);
     	if( $hxff && strcasecmp($hxff, $unk)){ return $hxff; }
 
 	    // 代理,  Nginx配置中传递这个参数
-    	$xreal = console_set_def(Console::$SERVER["HTTP_X_REAL_IP"],null);
+    	$xreal = xloger_set_def(XLoger::$SERVER["HTTP_X_REAL_IP"],null);
     	if( $xreal && strcasecmp($xreal, $unk)){ return $xreal; }
 	   
 	    // 直连远程
-    	$rmadd = console_set_def(Console::$SERVER['HTTP_REMOTE_ADDR'], null);
+    	$rmadd = xloger_set_def(XLoger::$SERVER['HTTP_REMOTE_ADDR'], null);
     	if( $rmadd && strcasecmp($rmadd, $unk)){ return $rmadd; }
 
 	    // 直连远程
-    	$rmadd = console_set_def(Console::$SERVER['REMOTE_ADDR'],null);
+    	$rmadd = xloger_set_def(XLoger::$SERVER['REMOTE_ADDR'],null);
     	if( $rmadd && strcasecmp($rmadd, $unk)){ return $rmadd; }
 	    return null;
+	}
+
+	// 取得socket连接对象
+	protected static function socket(){
+		static $socket;
+		if(isset($socket)) return $socket;
+		if( ($socket = @socket_create(AF_INET, SOCK_STREAM, 0)) === false) {
+			$socket = false;
+		}
+		if(@socket_connect($socket, XLOGER_SOCKET_ADDRESS, XLOGER_SOCKET_PORT)===false){
+			$socket = false;
+		}
+		return $socket;
 	}
 
 
@@ -563,35 +554,27 @@ class ConsoleHelper {
 		if(!$this->_watched){ // 补全进程信息
 			$post = array_merge($this->_threadData(), $post );
 		}
-		$this->_asyncRequest($post);
+		$this->publish("trace", $post);
 	}
 
-	// 线程开始
-	private function _traceThreadStart(){
-		if(!$this->_watched) return;
-		$this->_redis->set("console_thread:"+ $this->thread(), 1, 180 );
-
-		$post = array_merge( array("type"=>"threadStart" ), $this->_threadData() );
-		$this->_asyncRequest($post);
-	}
 
 	/**
 	 * 通用页面参数
 	 * 
 	 */
 	private function _threadData(){
-		$method = console_set_def(Console::$SERVER["REQUEST_METHOD"],"Execute");
+		$method = XLoger::s("REQUEST_METHOD", "Execute");
 		$data = array(
 			"thread" => $this->thread(),
 			"timestamp" => time(),
-			"host" => console_set_def(Console::$SERVER["HTTP_HOST"], "PHPScript: "),
-			"userAgent" => console_set_def(Console::$SERVER["HTTP_USER_AGENT"],"none"),
+			"host" => Xloger::s("HTTP_HOST", "PHPScript: "),
+			"userAgent" => Xloger::s("HTTP_USER_AGENT" ,"none"),
 			"clientIP" => $this->_client_ip,
 			"serverIP" => XLOGER_CURRENT_SERVER_IP,
 			"httpMethod" => $method,
 			"postData"=>  strtolower($method)=="post"?file_get_contents("php://input"):'',
-			"requestURI" => console_set_def(Console::$SERVER["REQUEST_URI"], Console::$args?getcwd().DIRECTORY_SEPARATOR. implode(" ", Console::$args):"unknown" ),
-			"cookie" => console_set_def(Console::$SERVER["HTTP_COOKIE"],"")
+			"requestURI" => Xloger::s("REQUEST_URI" , XLoger::$args?getcwd().DIRECTORY_SEPARATOR. implode(" ", XLoger::$args):"unknown" ),
+			"cookie" => Xloger::s("HTTP_COOKIE" ,"")
 		);
 		foreach ($data as $key => $value) {
 			if(is_string($value)){
@@ -601,11 +584,18 @@ class ConsoleHelper {
 		return $data;
 	}
 
+	// 线程开始
+	private function _traceThreadStart(){
+		if(!$this->_watched) return;
+		$this->_redis->set("xloger_thread:"+ $this->thread(), 1, 180 );
+		$post = array_merge( array("type"=>"threadStart" ), $this->_threadData() );
+		$this->publish("trace", $post);
+	}
+
 	// 线程结束
 	private function _traceThreadEnd(){
 		if(!$this->_watched) return;
-		$this->_redis->del("console_thread:"+ $this->thread() );
-		$this->_asyncRequest(array(
+		$this->publish( "trace", array(
 			"type"=>"threadEnd",
 			"thread" => $this->thread(),
 			"timestamp" => time(),
@@ -616,16 +606,12 @@ class ConsoleHelper {
 	/**
 	 * 发起异步请求
 	 */
-	private function _asyncRequest($post){
-		$data = array();
-		try{
-			$data = @json_encode($post, JSON_UNESCAPED_UNICODE);
-		}catch(Exception $e){
-			Console::exception($e);
-			return;
-		}
-		// redis 推送
-		$this->_redis->publish("console-log", $data );
+	public function publish($action, $data = array()){
+		$data = array("action"=> $action, "data"=>$data );
+		$stream = @json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_FORCE_OBJECT)."\n";
+		$socket = self::socket();
+		if($socket===false) return;
+		@socket_write($socket, $stream, strlen($stream));
 	}
 
 	// 线程
@@ -639,22 +625,12 @@ class ConsoleHelper {
     }
 }
 
-if(isset($argv)){
-	Console::shellArgs($argv);
-}
-// 初始化
-Console::_init();
-
-
-
-
-
 
 /**
- * class ConsoleSqlQueryTrace, mysql 查询跟踪对象;
+ * class XLogerSqlQueryTrace, mysql 查询跟踪对象;
  * @author idolo
  */
-class ConsoleSqlQueryTrace {
+class XLogerSqlQueryTrace {
 	private $query_pushed;
 	private $backtrace;
 
@@ -664,7 +640,7 @@ class ConsoleSqlQueryTrace {
 	public $time_start;
 	public $time_end;
 	
-	function __construct($querystring,$note="", $backtrace){
+	public function __construct($querystring,$note="", $backtrace){
 		// 去掉args属性, 改用 error, query, note ...
 		unset($backtrace['args']);
 
@@ -675,7 +651,7 @@ class ConsoleSqlQueryTrace {
 		$this->query_pushed = false;
 	}
 
-	// 输出 trace 数据,供参 Console::trace()
+	// 输出 trace 数据,供参 XLoger::trace()
 	public function traceData(){
 		return array_merge($this->backtrace, array(
 			"error" => $this->error,
@@ -702,13 +678,6 @@ class ConsoleSqlQueryTrace {
 	}
 
 	/**
-	 * get a mysql error via connection id
-	 */
-	public function mysqlError($conn){
-		$this->error = @mysql_error($conn);
-	}
-	
-	/**
 	 * query finish method
 	 * @param string $error
 	 */
@@ -716,9 +685,13 @@ class ConsoleSqlQueryTrace {
 		if($this->query_pushed){ return; } //防止执行多次finish();
 		$this->time_end = microtime( true );
 		$this->query_pushed = true;
-		Console::$helper->traceSql($this);
+		XLoger::$helper->traceSql($this);
 	}
 }
 
-
+// Fetch the Command Line args
+if(isset($argv)){
+	XLoger::shellArgs($argv);
+}
+XLoger::__init();
 ?>
