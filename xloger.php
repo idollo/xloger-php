@@ -472,12 +472,37 @@ class XLogerHelper {
 	 * 需要 XLOGER_TRACE_ADDR 
 	 */
 	public function trace($type, $data){
-		$fire = @json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+		$fire = @utf8_json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 		// json_encode 异常
 		if(json_last_error()!==JSON_ERROR_NONE){
+			switch (json_last_error()) {
+		        case JSON_ERROR_NONE:
+		            $jserr =  ' - No errors';
+		        	break;
+		        case JSON_ERROR_DEPTH:
+		            $jserr =   ' - Maximum stack depth exceeded';
+		        	break;
+		        case JSON_ERROR_STATE_MISMATCH:
+		            $jserr =   ' - Underflow or the modes mismatch';
+		        	break;
+		        case JSON_ERROR_CTRL_CHAR:
+		            $jserr =   ' - Unexpected control character found';
+		        	break;
+		        case JSON_ERROR_SYNTAX:
+		            $jserr =   ' - Syntax error, malformed JSON';
+		        	break;
+		        case JSON_ERROR_UTF8:
+		            $jserr =   ' - Malformed UTF-8 characters, possibly incorrectly encoded';
+		        	break;
+		        default:
+		            $jserr =   ' - Unknown error';
+		        	break;
+		    }
+
+
 			$error = array(
 				"type"=> E_WARNING,  
-				"message" => "PHP Warning:  json_encode(): ".json_last_error_msg(). ">>". @json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+				"message" => "PHP Warning:  json_encode(): {$jserr} >>". @utf8_json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR),
 				"file" => $data['file'], 
 				"line" => $data['line'] 
 			);
@@ -487,7 +512,7 @@ class XLogerHelper {
 		// 数据拼装
 		$post = array(
 			"type" => $type,
-			"thread" => mb_convert_encoding($this->thread(),'UTF-8','UTF-8'),
+			"thread" => $this->thread(),
 			"timestamp" => time(),
 			"fire" => $fire
 		);

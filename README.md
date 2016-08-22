@@ -3,7 +3,9 @@ The xloger-php library provides and API for communicating with [Xloger](https://
 
 
 ## Requirement
-This API required `sockets` module for high-performence communication. make sure you had installed this moudule and enabled in php.ini.            
+This API required `sockets` module for high-performence communication. make sure you had installed this moudule and enabled in php.ini.
+
+
 
 **Linux:**
 ```conf
@@ -18,8 +20,13 @@ extension=sockets.dll
 ## Install xloger for php
 require "xloger.php" in your index.php
 ```php
-define("XLOGER_SOCKET_ADDRESS", "127.0.0.1");   // the xloger server address
-define("XLOGER_SOCKET_PORT", "19527");          // the xloger server socket port
+require "[path to xloger]/xloger.php";
+```
+
+config the host as XLogerServer doesn't running at this server.
+```php
+// the xloger server address, default to 127.0.0.1
+define("XLOGER_SERVER_HOST", "192.168.1.2");
 
 require "[path to xloger]/xloger.php";
 ```
