@@ -41,11 +41,9 @@ if(file_exists( $console_config_file  )){
  */
 
 # Xloger 配置
-if(!defined("XLOGER_SOCKET_SERVER")){ define("XLOGER_SOCKET_SERVER", "XLogerServer"); }
-if(!defined("XLOGER_SOCKET_PORT")){ define("XLOGER_SOCKET_PORT", 19527 ); }
+if(!defined("XLOGER_SERVER_HOST")){ define("XLOGER_SERVER_HOST", "127.0.0.1"); }
+if(!defined("XLOGER_SERVER_PORT")){ define("XLOGER_SERVER_PORT", 19527 ); }
 
-# 服务器 IP
-if(!defined("XLOGER_CURRENT_SERVER_IP")){ define("XLOGER_CURRENT_SERVER_IP","127.0.0.1"); }
 
 # 是否监控页面线程
 if(!defined("XLOGER_TRACE_THREAD")){
@@ -296,27 +294,6 @@ class XLogerHelper {
 			$handshake_data = socket_read( $socket , 1024*1024 , PHP_NORMAL_READ );
 			$handshake_data = json_decode( $handshake_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 		}
-		// if(isset($handshake_data["ip"])){
-		// 	define(XLOGER_CURRENT_SERVER_IP, $handshake_data["ip"]);
-		// }
-		// 读取配置信息
-		// if(is_array($handshake_data)){
-		// 	$config = array_merge_recursive($config, $handshake_data);
-		// }
-
-
-		// 如果未注册服务器, 则注册服务器IP
-		// $ip_reged = isset($config["reportServers"]) && isset($config["reportServers"][XLOGER_CURRENT_SERVER_IP]);
-		// $host_reged = False;
-		// if($ip_reged){
-		// 	$host_reged = in_array($this->_host, $config["reportServers"][XLOGER_CURRENT_SERVER_IP]['hosts']);
-		// }
-		// if(!$ip_reged || !$host_reged){
-		// 	$this->publish("register", array(
-		// 		"ip" => XLOGER_CURRENT_SERVER_IP,
-		// 		"host" => $this->_host
-		// 	));
-		// }
 
 		// 开始时间
 		$this->requestTime =  xloger_set_def(XLoger::$SERVER['REQUEST_TIME_FLOAT'], microtime(true) );
@@ -483,7 +460,7 @@ class XLogerHelper {
 		if( ($socket = @socket_create(AF_INET, SOCK_STREAM, 0)) === false) {
 			$socket = false;
 		}
-		if(@socket_connect($socket, XLOGER_SOCKET_SERVER, XLOGER_SOCKET_PORT)===false){
+		if(@socket_connect($socket, XLOGER_SERVER_HOST, XLOGER_SERVER_PORT)===false){
 			$socket = false;
 		}
 		return $socket;
@@ -533,7 +510,6 @@ class XLogerHelper {
 			"host" => Xloger::s("HTTP_HOST", "PHPScript: "),
 			"userAgent" => Xloger::s("HTTP_USER_AGENT" ,"none"),
 			"clientIP" => $this->_client_ip,
-			"serverIP" => XLOGER_CURRENT_SERVER_IP,
 			"httpMethod" => $method,
 			"postData"=>  strtolower($method)=="post"?file_get_contents("php://input"):'',
 			"requestURI" => Xloger::s("REQUEST_URI" , XLoger::$args?getcwd().DIRECTORY_SEPARATOR. implode(" ", XLoger::$args):"unknown" ),
