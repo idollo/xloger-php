@@ -3,9 +3,9 @@ The xloger-php library provides and API for communicating with [Xloger](https://
 
 
 ## Requirement
+This is a client side library for [Xloger](https://github.com/idollo/xloger), make sure you had installed and started the server side app.
+
 This API required `sockets` module for high-performence communication. make sure you had installed this moudule and enabled in php.ini.
-
-
 
 **Linux:**
 ```conf
@@ -18,7 +18,7 @@ extension=sockets.dll
 ```
 
 ## Install xloger for php
-require "xloger.php" in your index.php
+copy xloger.php to your work dir, require "xloger.php" in your index.php
 ```php
 require "[path to xloger]/xloger.php";
 ```
