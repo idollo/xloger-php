@@ -41,7 +41,7 @@ if(file_exists( $console_config_file  )){
  */
 
 # Xloger 配置
-if(!defined("XLOGER_SERVER_HOST")){ define("XLOGER_SERVER_HOST", "127.0.0.1"); }
+if(!defined("XLOGER_SERVER_HOST")){ define("XLOGER_SERVER_HOST", "XLogerServer"); }
 if(!defined("XLOGER_SERVER_PORT")){ define("XLOGER_SERVER_PORT", 19527 ); }
 
 
@@ -102,8 +102,8 @@ function utf8_encode_deep(&$input) {
         }
     }
 }
-//
-function utf8_json_encode($data, $options = JSON_UNESCAPED_UNICODE ){
+// JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES = 320
+function utf8_json_encode($data, $options = 320 ){
 	utf8_encode_deep($data);
 	return json_encode($data, $options);
 }
@@ -135,9 +135,9 @@ class XLoger {
 		return self::$helper->log($vars);
 	}
 
-	// 写日志到文件
-	public static function logfile($filename, $datas ){
-		return self::$helper->logfile($filename, $datas );
+	// 创建文件日志用助手
+	public static function fileLoger($logfile ){
+		return new XFileLoger($logfile );
 	}
 
 	// warning
@@ -194,7 +194,7 @@ class XLoger {
 		}
 
 		// 不符合错误配置
-		if(!(XLOGER_TRACE_ERROR & $error_type)) return;
+		if(!(XLOGER_TRACE_ERROR & $error_type) || !ini_get('error_reporting')) return;
 		switch($error_type){
 			case E_ERROR:
 			case E_CORE_ERROR:
@@ -282,6 +282,16 @@ class XLogerHelper {
 		// 客户端IP
 		$this->_client_ip = $this->clientIP();
 
+		// 报告错误日志
+		if(XLOGER_CUSTOM_ERROR & XLoger::$TRACE_LOG){  
+			// 致命错误
+			register_shutdown_function( array("XLoger", "fatal_handler") );
+			// 捕获错误
+			set_error_handler( array('XLoger','error_handler') );
+			// 自动捕获异常
+			set_exception_handler( array('XLoger','exception_handler') );
+		}
+
 		$handshake_data = null;
 
 		// socket connection
@@ -298,15 +308,7 @@ class XLogerHelper {
 		// 开始时间
 		$this->requestTime =  xloger_set_def(XLoger::$SERVER['REQUEST_TIME_FLOAT'], microtime(true) );
 
-		// 报告错误日志
-		if(XLOGER_CUSTOM_ERROR & XLoger::$TRACE_LOG){  
-			// 致命错误
-			register_shutdown_function( array("XLoger", "fatal_handler") );
-			// 捕获错误
-			set_error_handler( array('XLoger','error_handler') );
-			// 自动捕获异常
-			set_exception_handler( array('XLoger','exception_handler') );
-		}
+		
 		// 是否监控线程
 		if(isset($handshake_data['accepted']) && $handshake_data['accepted']){
 			$this->_watched = true;
@@ -334,10 +336,6 @@ class XLogerHelper {
 		if(!XLOGER_ALWAYS_TRACE_LOG && !$this->_watched) return;
 		if(!(XLoger::$TRACE_LOG & XLOGER_CUSTOM_LOG) ) return;
 		return $this->trace( "log", $this->_pitchBacktrace(debug_backtrace()) );
-	}
-
-	public function logfile(){
-		return $this->trace( "logfile", $this->_pitchBacktrace(debug_backtrace()) );
 	}
 
 	/**
@@ -516,7 +514,7 @@ class XLogerHelper {
 			"timestamp" => time(),
 			"fire" => $fire
 		);
-		if(!$this->_watched){ // 补全进程信息
+		if(!$this->_watched && strtolower($type)!="filelog"){ // 补全进程信息
 			$post = array_merge($this->_threadData(), $post );
 		}
 		$this->publish("trace", $post);
@@ -527,7 +525,7 @@ class XLogerHelper {
 	 * 通用页面参数
 	 * 
 	 */
-	private function _threadData(){
+	public function _threadData(){
 		$method = XLoger::s("REQUEST_METHOD", "Execute");
 		$data = array(
 			"thread" => $this->thread(),
@@ -649,6 +647,80 @@ class XLogerSqlQueryTrace {
 		$this->time_end = microtime( true );
 		$this->query_pushed = true;
 		XLoger::$helper->traceSql($this);
+	}
+}
+
+
+/**
+ * FileLoger
+ */
+class XFileLoger {
+	protected	$_logfile;
+	public	$date_format = "Y-m-d H:i:s";
+	public	$sep = "\n---\n";
+	public	$argformat = "--[{i}]:{arg}";
+	public	$argsep = "\n";
+	public	$format = "[{date}] Logs on {file} in line {line}\n{logs}\n--{method}:{url} -- {clientip}";
+	
+	public function __construct($logfile){
+		$this->_logfile = $logfile;
+	}
+
+	public function log(){
+		$trace = array_splice(debug_backtrace(), 0, 1)[0];
+		$message = $this->_build_message($trace);
+		$this->_push($trace, $message);
+	}
+
+	public function logr(){
+		$trace = array_splice(debug_backtrace(), 0, 1)[0];
+		$message = $this->_build_message($trace, true);
+		$this->_push($trace, $message);
+	}
+
+	private function _push($trace, $message){
+		XLoger::$helper->trace("filelog", array(
+			"file" => $trace['file'],
+			"line" => $trace["line"],
+			"logfile" => $this->_logfile,
+			"message" => $message
+		));
+	}
+
+	private function _build_message($trace, $readable=false){
+		$td = XLoger::$helper->_threadData();
+		extract($td);
+		$file = $trace['file'];
+		$line = $trace['line'];
+		$sep = $this->sep;
+		$date = date($this->date_format);
+		$method = $httpMethod;
+		$uri = $requestURI;
+		$url = "http://{$host}{$uri}";
+		$clientip = $clientIP;
+		$logs = array();
+		$jsonopt = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+		if($readable) $jsonopt = $jsonopt | JSON_PRETTY_PRINT;
+		foreach ($trace['args'] as $i => $arg) {
+			$arg = is_string($arg) ? $arg : utf8_json_encode($arg, $jsonopt);
+			$logs[] = preg_replace_callback("|\{(.*?)\}|", function($match) use($arg, $i){
+				if(isset($match[1]) && isset($$match[1])){
+					return $$match[1];
+				}
+				return $match[0];
+			}, $this->argformat);
+		}
+		$logs = implode($this->argsep, $logs);
+
+		$vars = compact("date","sep","file","line","method","host","uri","url","clientip","useragent","logs");
+		$message = preg_replace_callback("|\{(.*?)\}|", function($match) use($vars){
+			extract($vars);
+			if(isset($match[1]) && isset($$match[1])){
+				return $$match[1];
+			}
+			return $match[0];
+		}, $this->format);
+		return $message;
 	}
 }
 
