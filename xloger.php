@@ -87,22 +87,23 @@ function xloger_set_def(&$var, $default = null) {
 /**
  * utf8_encode data
  */
-function utf8_encode_deep(&$input) {
+function utf8_encode_deep(&$input, $depth=8, $cur=1) {
+	if($cur>=$depth) return;
     if (is_string($input)) {
         $input = mb_convert_encoding($input,'UTF-8','UTF-8');
     } else if (is_array($input)) {
         foreach ($input as &$value) {
-            utf8_encode_deep($value);
+            utf8_encode_deep($value, $depth, ++$cur);
         }
         unset($value);
     } else if (is_object($input)) {
         $vars = array_keys(get_object_vars($input));
         foreach ($vars as $var) {
-            utf8_encode_deep($input->$var);
+            utf8_encode_deep($input->$var, $depth, ++$cur);
         }
     }
 }
-// JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES = 320
+// JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR = 320
 function utf8_json_encode($data, $options = 320 ){
 	utf8_encode_deep($data);
 	return json_encode($data, $options);
@@ -500,7 +501,7 @@ class XLogerHelper {
 
 			$error = array(
 				"type"=> E_WARNING,  
-				"message" => "PHP Warning:  json_encode(): {$jserr} >>". @utf8_json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR),
+				"message" => "PHP Warning:  json_encode(): {$jserr} >>". @utf8_json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ),
 				"file" => $data['file'], 
 				"line" => $data['line'] 
 			);
@@ -569,7 +570,7 @@ class XLogerHelper {
 	 */
 	public function publish($action, $data = array()){
 		$data = array("action"=> $action, "data"=>$data );
-		$stream = @json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_FORCE_OBJECT)."\n";
+		$stream = @json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )."\n";
 		$socket = self::socket();
 		if($socket===false) return;
 		@socket_write($socket, $stream, strlen($stream));
@@ -653,6 +654,8 @@ class XLogerSqlQueryTrace {
 
 /**
  * FileLoger
+ * 全局关闭文件日志
+ * define("X_FILE_LOGER_DISABLED", true);
  */
 class XFileLoger {
 	protected	$_logfile;
@@ -667,24 +670,31 @@ class XFileLoger {
 	}
 
 	public function log(){
+		if($this->_disabled()) return;
 		$trace = array_splice(debug_backtrace(), 0, 1)[0];
 		$message = $this->_build_message($trace);
 		$this->_push($trace, $message);
 	}
 
 	public function logr(){
+		if($this->_disabled()) return;
 		$trace = array_splice(debug_backtrace(), 0, 1)[0];
 		$message = $this->_build_message($trace, true);
 		$this->_push($trace, $message);
 	}
 
 	private function _push($trace, $message){
+		if($this->_disabled()) return;
 		XLoger::$helper->trace("filelog", array(
 			"file" => $trace['file'],
 			"line" => $trace["line"],
 			"logfile" => $this->_logfile,
 			"message" => $message
 		));
+	}
+
+	private function _disabled(){
+		return !!(defined("X_FILE_LOGER_DISABLED") && X_FILE_LOGER_DISABLED);
 	}
 
 	private function _build_message($trace, $readable=false){
