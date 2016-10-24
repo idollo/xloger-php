@@ -666,7 +666,8 @@ class XFileLoger {
 	public	$format = "[{date}] Logs on {file} in line {line}\n{logs}\n--{method}:{url} -- {clientip}";
 	
 	public function __construct($logfile){
-		$this->_logfile = $logfile;
+		$branch = isset($_SERVER["XLOGER_BRANCH"])?($_SERVER["XLOGER_BRANCH"]."/"):"";
+		$this->_logfile = $branch.$logfile;
 	}
 
 	public function log(){
