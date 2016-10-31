@@ -194,8 +194,10 @@ class XLoger {
 			self::display_error($data);
 		}
 
+
 		// 不符合错误配置
 		if(!(XLOGER_TRACE_ERROR & $error_type) || !ini_get('error_reporting')) return;
+		echo "error_reporting";
 		switch($error_type){
 			case E_ERROR:
 			case E_CORE_ERROR:
@@ -284,7 +286,7 @@ class XLogerHelper {
 		$this->_client_ip = $this->clientIP();
 
 		// 报告错误日志
-		if(XLOGER_CUSTOM_ERROR & XLoger::$TRACE_LOG){  
+		if(XLOGER_CUSTOM_ERROR & XLoger::$TRACE_LOG){
 			// 致命错误
 			register_shutdown_function( array("XLoger", "fatal_handler") );
 			// 捕获错误
@@ -413,7 +415,7 @@ class XLogerHelper {
 		$data = array(
 			"file" => $point["file"],
 			"line" => $point["line"],
-			"message" => xloger_set_def($point["args"][0],"no-message"),
+			"message" => (isset($point["args"][0]) && is_string($point["args"][0])) ?  $point["args"][0] : "no-message",
 			"args" => $point["args"]
 		);
 		return $data;
@@ -515,7 +517,7 @@ class XLogerHelper {
 			"timestamp" => time(),
 			"fire" => $fire
 		);
-		if(!$this->_watched && strtolower($type)!="filelog"){ // 补全进程信息
+		if(strtolower($type)!="filelog"){ // 补全进程信息
 			$post = array_merge($this->_threadData(), $post );
 		}
 		$this->publish("trace", $post);
