@@ -197,7 +197,6 @@ class XLoger {
 
 		// 不符合错误配置
 		if(!(XLOGER_TRACE_ERROR & $error_type) || !ini_get('error_reporting')) return;
-		echo "error_reporting";
 		switch($error_type){
 			case E_ERROR:
 			case E_CORE_ERROR:
