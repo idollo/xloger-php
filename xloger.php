@@ -303,7 +303,8 @@ class XLogerHelper {
 			$threaddata =  $this->_threadData();
 			// unset postData, 避免大量数据
 			unset($threaddata["postData"]);
-			$this->publish("checkin", $this->_threadData() );
+			$this->publish("checkin", $threaddata );
+			@socket_set_block($socket);
 			$handshake_data = socket_read( $socket , 1024*1024 , PHP_NORMAL_READ );
 			@socket_set_nonblock($socket);
 			$handshake_data = json_decode( $handshake_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
@@ -480,8 +481,6 @@ class XLogerHelper {
 			    }
 			    usleep(2);
 			}
-			// re-block the socket if needed
-			$socket && socket_set_block($socket);
 		}
 		return $socket;
 	}
@@ -579,13 +578,18 @@ class XLogerHelper {
 
 	// 线程结束
 	private function _traceThreadEnd(){
-		if(!$this->_watched) return;
+		$socket = self::socket();
+		if(!$this->_watched) {
+			$socket && @socket_close($socket);
+			return;
+		}
 		$this->publish( "trace", array(
 			"type"=>"threadEnd",
 			"thread" => $this->thread(),
 			"timestamp" => time(),
 			"duration" => microtime(true) - $this->requestTime
 		));
+		$socket && @socket_close($socket);
 	}
 
 	/**
