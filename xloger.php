@@ -43,7 +43,8 @@ if(file_exists( $console_config_file  )){
 # Xloger 配置
 if(!defined("XLOGER_SERVER_HOST")){ define("XLOGER_SERVER_HOST", "XLogerServer"); }
 if(!defined("XLOGER_SERVER_PORT")){ define("XLOGER_SERVER_PORT", 19527 ); }
-
+# timeout ms
+if(!defined("XLOGER_SOCKET_CONNECT_TIMEOUT")){ define("XLOGER_SOCKET_CONNECT_TIMEOUT", 3 ); }
 
 # 是否监控页面线程
 if(!defined("XLOGER_TRACE_THREAD")){
@@ -460,8 +461,26 @@ class XLogerHelper {
 		if( ($socket = @socket_create(AF_INET, SOCK_STREAM, 0)) === false) {
 			$socket = false;
 		}
-		if(@socket_connect($socket, XLOGER_SERVER_HOST, XLOGER_SERVER_PORT)===false){
-			$socket = false;
+		if(is_resource($socket)){
+			// switch to non-blocking
+			socket_set_nonblock($socket);
+			// store the current time
+			$start_time = microtime(true)*1000;
+			// loop until a connection is gained or timeout reached
+			while (!@socket_connect($socket, XLOGER_SERVER_HOST, XLOGER_SERVER_PORT)) {
+			    $err = socket_last_error($socket);
+			    // success! connected ok
+			    if($err === 56) { break; }
+			    // if timeout reaches then close socket, return false;
+			    if ((microtime(true)*1000 - $start_time) >= XLOGER_SOCKET_CONNECT_TIMEOUT) {
+			        socket_close($socket);
+			        $socket = false;
+			        break;
+			    }
+			    usleep(2);
+			}
+			// re-block the socket if needed
+			$socket && socket_set_block($socket);
 		}
 		return $socket;
 	}
