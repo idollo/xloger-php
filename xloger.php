@@ -305,6 +305,7 @@ class XLogerHelper {
 			unset($threaddata["postData"]);
 			$this->publish("checkin", $this->_threadData() );
 			$handshake_data = socket_read( $socket , 1024*1024 , PHP_NORMAL_READ );
+			@socket_set_nonblock($socket);
 			$handshake_data = json_decode( $handshake_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 		}
 
@@ -547,6 +548,8 @@ class XLogerHelper {
 	 * 
 	 */
 	public function _threadData(){
+		static $data;
+		if(isset($data)) return $data;
 		$method = XLoger::s("REQUEST_METHOD", "Execute");
 		$data = array(
 			"thread" => $this->thread(),
