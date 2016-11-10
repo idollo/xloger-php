@@ -305,7 +305,7 @@ class XLogerHelper {
 			unset($threaddata["postData"]);
 			$this->publish("checkin", $threaddata );
 			@socket_set_block($socket);
-			$handshake_data = socket_read( $socket , 1024*1024 , PHP_NORMAL_READ );
+			$handshake_data = @socket_read( $socket , 1024*1024 , PHP_NORMAL_READ );
 			@socket_set_nonblock($socket);
 			$handshake_data = json_decode( $handshake_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 		}
@@ -470,12 +470,12 @@ class XLogerHelper {
 			$start_time = microtime(true)*1000;
 			// loop until a connection is gained or timeout reached
 			while (!@socket_connect($socket, XLOGER_SERVER_HOST, XLOGER_SERVER_PORT)) {
-			    $err = socket_last_error($socket);
+			    $errno = socket_last_error($socket);
 			    // success! connected ok
-			    if($err === 56) { break; }
+			    if($errno === 56) { break; }
 			    // if timeout reaches then close socket, return false;
 			    if ((microtime(true)*1000 - $start_time) >= XLOGER_SOCKET_CONNECT_TIMEOUT) {
-			        socket_close($socket);
+			        @socket_close($socket);
 			        $socket = false;
 			        break;
 			    }
