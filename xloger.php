@@ -71,7 +71,10 @@ if(!defined("XLOGER_ALWAYS_TRACE_LOG")){
 	define("XLOGER_ALWAYS_TRACE_LOG", 0 );
 }
 
-
+# 是否block socket connect
+if(!defined("XLOGER_BLOCK_SOCKET_ON_CONNECT")){
+	define("XLOGER_BLOCK_SOCKET_ON_CONNECT", 1 );
+}
 
 /**
  * Set default value to which if variable is unset.
@@ -465,12 +468,19 @@ class XLogerHelper {
 		}
 		if(is_resource($socket)){
 			// switch to non-blocking
-			socket_set_nonblock($socket);
-			// store the current time
-			$start_time = microtime(true)*1000;
+			if(!XLOGER_BLOCK_SOCKET_ON_CONNECT){
+				socket_set_nonblock($socket);
+				// store the current time
+				$start_time = microtime(true)*1000;
+			}
+			
 			// loop until a connection is gained or timeout reached
 			while (!@socket_connect($socket, XLOGER_SERVER_HOST, XLOGER_SERVER_PORT)) {
-			    $errno = socket_last_error($socket);
+				if(XLOGER_BLOCK_SOCKET_ON_CONNECT){
+					# 连接失败
+					return false;
+				}
+			    $errno = @socket_last_error($socket);
 			    // success! connected ok
 			    if($errno === 56) { break; }
 			    // if timeout reaches then close socket, return false;
