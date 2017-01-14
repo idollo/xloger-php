@@ -610,6 +610,7 @@ class XLogerHelper {
 		$stream = @json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )."\n";
 		$socket = self::socket();
 		if($socket===false) return;
+		@socket_set_nonblock($socket);
 		@socket_write($socket, $stream, strlen($stream));
 	}
 
