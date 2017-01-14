@@ -43,6 +43,9 @@ if(file_exists( $console_config_file  )){
 # Xloger 配置
 if(!defined("XLOGER_SERVER_HOST")){ define("XLOGER_SERVER_HOST", "XLogerServer"); }
 if(!defined("XLOGER_SERVER_PORT")){ define("XLOGER_SERVER_PORT", 19527 ); }
+
+# 是否block socket connect
+if(!defined("XLOGER_BLOCK_SOCKET_ON_CONNECT")){ define("XLOGER_BLOCK_SOCKET_ON_CONNECT", 0 ); }
 # timeout ms
 if(!defined("XLOGER_SOCKET_CONNECT_TIMEOUT")){ define("XLOGER_SOCKET_CONNECT_TIMEOUT", 3 ); }
 
@@ -71,10 +74,6 @@ if(!defined("XLOGER_ALWAYS_TRACE_LOG")){
 	define("XLOGER_ALWAYS_TRACE_LOG", 0 );
 }
 
-# 是否block socket connect
-if(!defined("XLOGER_BLOCK_SOCKET_ON_CONNECT")){
-	define("XLOGER_BLOCK_SOCKET_ON_CONNECT", 1 );
-}
 
 /**
  * Set default value to which if variable is unset.
@@ -300,17 +299,21 @@ class XLogerHelper {
 
 		$handshake_data = null;
 
-		// socket connection
-		$socket = self::socket();
-		if($socket !== false){
-			$threaddata =  $this->_threadData();
-			// unset postData, 避免大量数据
-			unset($threaddata["postData"]);
-			$this->publish("checkin", $threaddata );
-			@socket_set_block($socket);
-			$handshake_data = @socket_read( $socket , 1024*1024 , PHP_NORMAL_READ );
-			@socket_set_nonblock($socket);
-			$handshake_data = json_decode( $handshake_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+		try{
+			// socket connection
+			$socket = self::socket();
+			if($socket !== false){
+				$threaddata =  $this->_threadData();
+				// unset postData, 避免大量数据
+				unset($threaddata["postData"]);
+				$this->publish("checkin", $threaddata );
+				@socket_set_block($socket);
+				$handshake_data = @socket_read( $socket , 1024*1024 , PHP_NORMAL_READ );
+				@socket_set_nonblock($socket);
+				$handshake_data = json_decode( $handshake_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+			}
+		}catche(Exception $e){
+			return;
 		}
 
 		// 开始时间
