@@ -312,7 +312,7 @@ class XLogerHelper {
 				@socket_set_nonblock($socket);
 				$handshake_data = json_decode( $handshake_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 			}
-		}catche(Exception $e){
+		}catch(Exception $e){
 			return;
 		}
 
