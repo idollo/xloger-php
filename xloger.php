@@ -20,7 +20,7 @@
 # 系统定义, 不要修改其属性
 # -------------------------------------
 # 
-# 自定义 Log 级别属性
+# Log类型常量
 # 
 define("XLOGER_CUSTOM_NONE", 0);
 define("XLOGER_CUSTOM_LOG", 1);
@@ -29,11 +29,13 @@ define("XLOGER_CUSTOM_ERROR", 4);
 define("XLOGER_CUSTOM_SQL", 8);
 define("XLOGER_CUSTOM_ALL", 15);
 
-
+# 如果同目录下存在文件xloger.config.php, 则加载该配置文件
+# 配置文件可define配置后边的自定义配置项目
 $console_config_file = dirname(__FILE__).DIRECTORY_SEPARATOR."xloger.config.php";
 if(file_exists( $console_config_file  )){
 	require($console_config_file);
 }
+
 /*!
  * 以下是自定义配置
  * ---------------------------------------
@@ -44,32 +46,38 @@ if(file_exists( $console_config_file  )){
 if(!defined("XLOGER_SERVER_HOST")){ define("XLOGER_SERVER_HOST", "XLogerServer"); }
 if(!defined("XLOGER_SERVER_PORT")){ define("XLOGER_SERVER_PORT", 19527 ); }
 
-# 是否block socket connect
+# 连接XLOGER_SERVER时可设置socket堵塞连接还是异步连接, 如果XLOGER_SERVER不在网络上时(如关机中), 
+# 堵塞连接会产生长延时, 从而导致PHP脚本堵塞, 若php脚本和XLOGER_SERVER不在同一台服务上, 建议使用异步
+# 而设置异步超时XLOGER_SOCKET_CONNECT_TIMEOUT, 如果XLOGER_SERVER挂了, 便会超时跳过, 不进一步影响PHP的脚本执行
+# 本脚本和XLOGER_SERVER安装在同一台主机上, 可考虑使用堵塞
 if(!defined("XLOGER_BLOCK_SOCKET_ON_CONNECT")){ define("XLOGER_BLOCK_SOCKET_ON_CONNECT", 0 ); }
-# timeout ms
+# Socket handshake timeout: ms
+# 推荐本脚本主机到XLOGER_SERVER的平均ping值2倍即可
 if(!defined("XLOGER_SOCKET_CONNECT_TIMEOUT")){ define("XLOGER_SOCKET_CONNECT_TIMEOUT", 3 ); }
 
-# 是否监控页面线程
-if(!defined("XLOGER_TRACE_THREAD")){
-	define("XLOGER_TRACE_THREAD", 1);
-}
-
-# 监控的错误类型  e.g.  E_ALL ^ E_NOTICE
+# 监控的错误类型, 即发送到 XLOGER_SERVER 的错误级别
+# 参照php.ini的 error_reporting 配置 e.g.  E_ALL ^ E_NOTICE
 if(!defined("XLOGER_TRACE_ERROR")){
 	define("XLOGER_TRACE_ERROR", E_ALL );
 }
-
+# 本脚本会拦截系统的错误回调, 以至于系统内核不会收到error_reporting的消息
+# 所以php.ini中的 display_errors 相当于无效
+# 需要在页面上打印错误信息, 请设置 XLOGER_DISPLAY_ERRORS 为 1
 if(!defined("XLOGER_DISPLAY_ERRORS")){
 	define("XLOGER_DISPLAY_ERRORS", 0);
 }
 
 # 自定义监控信息 ::log()  ::warning()  ::error()
 # 关闭所有 XLoger::$TRACE_LOG = XLOGER_CUSTOM_NONE;
+# 参见本脚本前置的 Log类型常量 说明
 if(!defined("XLOGER_TRACE_LOG")){
 	define("XLOGER_TRACE_LOG", XLOGER_CUSTOM_ALL );
 }
 
-# 总是发送log信息
+# 默认情况下, 在XLOGER_SERVER的WebUI实时监控页面, 没有创建监控或不符合监控筛选的条件下
+# 本脚本不会向 XLOGER_SERVER 发送非错误日志, 而设置XLOGER_ALWAYS_TRACE_LOG, 则会强制发送
+# 而错误日志, 即使不在实时监控条件下, 也会根据 XLOGER_TRACE_ERROR 的配置向XLOGER_SERVER发送报告
+# 以供XLOGER生成错误日志文件
 if(!defined("XLOGER_ALWAYS_TRACE_LOG")){
 	define("XLOGER_ALWAYS_TRACE_LOG", 0 );
 }
@@ -188,7 +196,8 @@ class XLoger {
 	public static function error_handler($error_type, $message, $file, $line, $info=null){
 		//	$error_types = array(
 		//		1=>'ERROR', 2=>'WARNING', 4=>'PARSE', 8=>'NOTICE', 16=>'CORE_ERROR', 
-		//		32=>'CORE_WARNING', 64=>'COMPILE_ERROR', 128=>'COMPILE_WARNING', 256=>'USER_ERROR', 512=>'USER_WARNING', 1024=>'USER_NOTICE', 2047=>'ALL', 2048=>'STRICT'
+		//		32=>'CORE_WARNING', 64=>'COMPILE_ERROR', 128=>'COMPILE_WARNING', 256=>'USER_ERROR', 
+		//		512=>'USER_WARNING', 1024=>'USER_NOTICE', 2047=>'ALL', 2048=>'STRICT'
 		//	);
 		$data = array("type"=>$error_type,  "message" => $message, "file" => $file, "line" => $line );
 
@@ -476,7 +485,7 @@ class XLogerHelper {
 				// store the current time
 				$start_time = microtime(true)*1000;
 			}
-			
+			$sleept = 0;
 			// loop until a connection is gained or timeout reached
 			while (!@socket_connect($socket, XLOGER_SERVER_HOST, XLOGER_SERVER_PORT)) {
 				if(XLOGER_BLOCK_SOCKET_ON_CONNECT){
@@ -492,7 +501,9 @@ class XLogerHelper {
 			        $socket = false;
 			        break;
 			    }
-			    usleep(2);
+			    usleep($sleept);
+			    # 最多5ms检查一次是否连接成功
+			    if($sleept < 5){ $sleept++; }
 			}
 		}
 		return $socket;
