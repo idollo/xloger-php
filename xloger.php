@@ -140,7 +140,10 @@ class XLoger {
 	public static function __init(){
 		self::$SERVER = isset($_SERVER)?$_SERVER:array();
 		self::$helper = new XLogerHelper();
-		register_shutdown_function(array(self::$helper, '_traceThreadEnd'));
+		$helper = self::$helper;
+		register_shutdown_function(function(){
+			$helper->_traceThreadEnd();
+		});
 	}
 
 	// log
