@@ -141,7 +141,7 @@ class XLoger {
 		self::$SERVER = isset($_SERVER)?$_SERVER:array();
 		self::$helper = new XLogerHelper();
 		$helper = self::$helper;
-		register_shutdown_function(function(){
+		register_shutdown_function(function() use($helper){
 			$helper->_traceThreadEnd();
 		});
 	}
