@@ -613,7 +613,7 @@ class XLogerHelper {
 
 
 	public function shutdown(){
-		$this->_traceThreadEnd()
+		$this->_traceThreadEnd();
 	}
 
 	/**
