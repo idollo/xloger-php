@@ -140,9 +140,8 @@ class XLoger {
 	public static function __init(){
 		self::$SERVER = isset($_SERVER)?$_SERVER:array();
 		self::$helper = new XLogerHelper();
-		$helper = self::$helper;
-		register_shutdown_function(function() use($helper){
-			$helper->_traceThreadEnd();
+		register_shutdown_function(function(){
+			XLoger::$helper->shutdown();
 		});
 	}
 
@@ -610,6 +609,11 @@ class XLogerHelper {
 			"duration" => microtime(true) - $this->requestTime
 		));
 		$socket && @socket_close($socket);
+	}
+
+
+	public function shutdown(){
+		$this->_traceThreadEnd()
 	}
 
 	/**
