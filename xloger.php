@@ -140,6 +140,7 @@ class XLoger {
 	public static function __init(){
 		self::$SERVER = isset($_SERVER)?$_SERVER:array();
 		self::$helper = new XLogerHelper();
+		register_shutdown_function(array(self::$helper, '_traceThreadEnd'));
 	}
 
 	// log
@@ -340,14 +341,6 @@ class XLogerHelper {
 		// 线程开始
 		$this->_traceThreadStart();
 	}
-
-	/**
-	 * 线程销毁前回调
-	 */
-	public function __destruct(){
-		if($this->_watched) $this->_traceThreadEnd();
-	}
-
 	
 	/**
 	 * log 数据
