@@ -299,16 +299,6 @@ class XLogerHelper {
 		// 客户端IP
 		$this->_client_ip = $this->clientIP();
 
-		// 报告错误日志
-		if(XLOGER_CUSTOM_ERROR & XLoger::$TRACE_LOG){
-			// 致命错误
-			register_shutdown_function( array("XLoger", "fatal_handler") );
-			// 捕获错误
-			set_error_handler( array('XLoger','error_handler') );
-			// 自动捕获异常
-			set_exception_handler( array('XLoger','exception_handler') );
-		}
-
 		$handshake_data = null;
 
 		try{
@@ -326,6 +316,14 @@ class XLogerHelper {
 			}
 		}catch(Exception $e){
 			return;
+		}
+
+		// 报告错误日志
+		if(XLOGER_CUSTOM_ERROR & XLoger::$TRACE_LOG){
+			// 捕获错误
+			set_error_handler( array('XLoger','error_handler') );
+			// 自动捕获异常
+			set_exception_handler( array('XLoger','exception_handler') );
 		}
 
 		// 开始时间
