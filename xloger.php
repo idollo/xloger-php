@@ -722,14 +722,16 @@ class XFileLoger {
 
 	public function log(){
 		if($this->_disabled()) return;
-		$trace = array_splice(debug_backtrace(), 0, 1)[0];
+		$backtrace = debug_backtrace();
+		$trace = array_splice($backtrace, 0, 1)[0];
 		$message = $this->_build_message($trace);
 		$this->_push($trace, $message);
 	}
 
 	public function logr(){
 		if($this->_disabled()) return;
-		$trace = array_splice(debug_backtrace(), 0, 1)[0];
+		$backtrace = debug_backtrace();
+		$trace = array_splice($backtrace, 0, 1)[0];
 		$message = $this->_build_message($trace, true);
 		$this->_push($trace, $message);
 	}
