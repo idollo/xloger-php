@@ -767,8 +767,8 @@ class XFileLoger {
 		foreach ($trace['args'] as $i => $arg) {
 			$arg = is_string($arg) ? $arg : utf8_json_encode($arg, $jsonopt);
 			$logs[] = preg_replace_callback("|\{(.*?)\}|", function($match) use($arg, $i){
-				if(isset($match[1]) && isset($$match[1])){
-					return $$match[1];
+				if(isset($match[1]) && isset(${$match[1]})){
+					return ${$match[1]};
 				}
 				return $match[0];
 			}, $this->argformat);
@@ -778,8 +778,8 @@ class XFileLoger {
 		$vars = compact("date","sep","file","line","method","host","uri","url","clientip","useragent","logs");
 		$message = preg_replace_callback("|\{(.*?)\}|", function($match) use($vars){
 			extract($vars);
-			if(isset($match[1]) && isset($$match[1])){
-				return $$match[1];
+			if(isset($match[1]) && isset(${$match[1]})){
+				return ${$match[1]};
 			}
 			return $match[0];
 		}, $this->format);
