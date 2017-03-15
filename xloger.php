@@ -53,7 +53,7 @@ if(!defined("XLOGER_SERVER_PORT")){ define("XLOGER_SERVER_PORT", 19527 ); }
 if(!defined("XLOGER_BLOCK_SOCKET_ON_CONNECT")){ define("XLOGER_BLOCK_SOCKET_ON_CONNECT", 0 ); }
 # Socket handshake timeout: ms
 # 推荐本脚本主机到XLOGER_SERVER的平均ping值2倍即可
-if(!defined("XLOGER_SOCKET_CONNECT_TIMEOUT")){ define("XLOGER_SOCKET_CONNECT_TIMEOUT", 3 ); }
+if(!defined("XLOGER_SOCKET_CONNECT_TIMEOUT")){ define("XLOGER_SOCKET_CONNECT_TIMEOUT", 10 ); }
 
 # 监控的错误类型, 即发送到 XLOGER_SERVER 的错误级别
 # 参照php.ini的 error_reporting 配置 e.g.  E_ALL ^ E_NOTICE
@@ -575,7 +575,7 @@ class XLogerHelper {
 			"clientIP" => $this->_client_ip,
 			"httpMethod" => $method,
 			"postData"=>  strtolower($method)=="post"?file_get_contents("php://input"):'',
-			"requestURI" => Xloger::s("REQUEST_URI" , XLoger::$args?getcwd().DIRECTORY_SEPARATOR. implode(" ", XLoger::$args):"unknown" ),
+			"requestURI" => Xloger::s( "HTTP_X_REQUEST_URI", Xloger::s("REQUEST_URI" , XLoger::$args?getcwd().DIRECTORY_SEPARATOR. implode(" ", XLoger::$args):"unknown" )),
 			"cookie" => Xloger::s("HTTP_COOKIE" ,"")
 		);
 		foreach ($data as $key => $value) {
