@@ -575,7 +575,7 @@ class XLogerHelper {
 			"clientIP" => $this->_client_ip,
 			"httpMethod" => $method,
 			"postData"=>  strtolower($method)=="post"?file_get_contents("php://input"):'',
-			"requestURI" => Xloger::s( "HTTP_X_REQUEST_URI", Xloger::s("REQUEST_URI" , XLoger::$args?getcwd().DIRECTORY_SEPARATOR. implode(" ", XLoger::$args):"unknown" )),
+			"requestURI" => self::request_uri(),
 			"cookie" => Xloger::s("HTTP_COOKIE" ,"")
 		);
 		foreach ($data as $key => $value) {
@@ -584,6 +584,12 @@ class XLogerHelper {
 			}
 		}
 		return $data;
+	}
+
+	public static function request_uri(){
+		$xrequest_uri = Xloger::s("HTTP_X_REQUEST_URI", "");
+		if($xrequest_uri) { $xrequest_uri; }
+		return Xloger::s("REQUEST_URI" , XLoger::$args?getcwd().DIRECTORY_SEPARATOR. implode(" ", XLoger::$args):"unknown");
 	}
 
 	// 线程开始
