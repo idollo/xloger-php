@@ -588,7 +588,7 @@ class XLogerHelper {
 
 	public static function request_uri(){
 		$xrequest_uri = Xloger::s("HTTP_X_REQUEST_URI", "");
-		if($xrequest_uri) { $xrequest_uri; }
+		if($xrequest_uri) { return $xrequest_uri; }
 		return Xloger::s("REQUEST_URI" , XLoger::$args?getcwd().DIRECTORY_SEPARATOR. implode(" ", XLoger::$args):"unknown");
 	}
 
