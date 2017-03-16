@@ -636,7 +636,7 @@ class XLogerHelper {
         return self::__iter($data, 0, $depth);
 	}
 
-	static function __iter($d, $level=0, $depth=8)){
+	static function __iter($d, $level=0, $depth=8){
 		if($level>$depth) return $d;
         if(is_array($d)){
             foreach ($d as $i => $v) { $d[$i] = self::__iter($v, $level+1, $depth); }
