@@ -624,12 +624,31 @@ class XLogerHelper {
 	 * 发起异步请求
 	 */
 	public function publish($action, $data = array()){
-		$data = array("action"=> $action, "data"=>$data );
+		$data = array("action"=> $action, "data"=> $this->__fixjson($data) );
 		$stream = @json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )."\n";
 		$socket = self::socket();
 		if($socket===false) return;
 		@socket_set_nonblock($socket);
 		@socket_write($socket, $stream, strlen($stream));
+	}
+
+	private function __fixjson($data){
+		function iter($d, $level=0, $depth=8){
+                if($level>$depth) return $d;
+                if(is_array($d)){
+                    foreach ($d as $i => $v) { $d[$i] = iter($v, $level+1, $depth); }
+                    return $d;
+                }
+                if(is_float($d)){ return fix_float($d); }
+                return $d;
+        }
+        function fix_float($f){
+                $p = 16 - strlen(intval($f));
+                $f = number_format($f, $p);
+                if($p>1){ $f = preg_replace('/0+$/','', $f); }
+                return $f;
+        }
+        return iter($data, 0, $depth);
 	}
 
 	// 线程
