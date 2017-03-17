@@ -53,7 +53,7 @@ if(!defined("XLOGER_SERVER_PORT")){ define("XLOGER_SERVER_PORT", 19527 ); }
 if(!defined("XLOGER_BLOCK_SOCKET_ON_CONNECT")){ define("XLOGER_BLOCK_SOCKET_ON_CONNECT", 0 ); }
 # Socket handshake timeout: ms
 # 推荐本脚本主机到XLOGER_SERVER的平均ping值2倍即可
-if(!defined("XLOGER_SOCKET_CONNECT_TIMEOUT")){ define("XLOGER_SOCKET_CONNECT_TIMEOUT", 3 ); }
+if(!defined("XLOGER_SOCKET_CONNECT_TIMEOUT")){ define("XLOGER_SOCKET_CONNECT_TIMEOUT", 10 ); }
 
 # 监控的错误类型, 即发送到 XLOGER_SERVER 的错误级别
 # 参照php.ini的 error_reporting 配置 e.g.  E_ALL ^ E_NOTICE
@@ -285,11 +285,17 @@ class XLogerHelper {
 	public function __construct(){
 		// 线程ID参数
 		$this->_thread = $this->createThreadID();
-		$headers = function_exists("getallheaders")? getallheaders() : array();
-		if(isset($headers["xloger-thread"])){
-			$super_thread = $headers["xloger-thread"];
-		}else{
-			$super_thread =  isset($_REQUEST['xloger_thread'])?$_REQUEST['xloger_thread'] : null;
+
+		$super_thread = xloger_set_def(XLoger::$SERVER['HTTP_XLOGER_THREAD'], null);
+		if(!$super_thread && isset($_REQUEST['xloger_thread'])){
+			$super_thread = $_REQUEST['xloger_thread'];
+		}
+		if(!$super_thread){
+			$super_thread = xloger_set_def(XLoger::$SERVER['HTTP_CONSOLE_THREAD'], null);
+		}
+		// 兼容console_thread参数
+		if(!$super_thread && isset($_REQUEST['console_thread'])){
+			$super_thread = $_REQUEST['console_thread'];
 		}
 		if($super_thread){
 			$this->_thread = $super_thread."_".$this->_thread;
@@ -575,7 +581,7 @@ class XLogerHelper {
 			"clientIP" => $this->_client_ip,
 			"httpMethod" => $method,
 			"postData"=>  strtolower($method)=="post"?file_get_contents("php://input"):'',
-			"requestURI" => Xloger::s("REQUEST_URI" , XLoger::$args?getcwd().DIRECTORY_SEPARATOR. implode(" ", XLoger::$args):"unknown" ),
+			"requestURI" => self::request_uri(),
 			"cookie" => Xloger::s("HTTP_COOKIE" ,"")
 		);
 		foreach ($data as $key => $value) {
@@ -584,6 +590,12 @@ class XLogerHelper {
 			}
 		}
 		return $data;
+	}
+
+	public static function request_uri(){
+		$xrequest_uri = Xloger::s("HTTP_X_REQUEST_URI", "");
+		if($xrequest_uri) { return $xrequest_uri; }
+		return Xloger::s("REQUEST_URI" , XLoger::$args?getcwd().DIRECTORY_SEPARATOR. implode(" ", XLoger::$args):"unknown");
 	}
 
 	// 线程开始
@@ -618,7 +630,7 @@ class XLogerHelper {
 	 * 发起异步请求
 	 */
 	public function publish($action, $data = array()){
-		$data = array("action"=> $action, "data"=>$data );
+		$data = array("action"=> $action, "data"=> $data);
 		$stream = @json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )."\n";
 		$socket = self::socket();
 		if($socket===false) return;
@@ -722,14 +734,16 @@ class XFileLoger {
 
 	public function log(){
 		if($this->_disabled()) return;
-		$trace = array_splice(debug_backtrace(), 0, 1)[0];
+		$backtrace = debug_backtrace();
+		$trace = array_splice($backtrace, 0, 1)[0];
 		$message = $this->_build_message($trace);
 		$this->_push($trace, $message);
 	}
 
 	public function logr(){
 		if($this->_disabled()) return;
-		$trace = array_splice(debug_backtrace(), 0, 1)[0];
+		$backtrace = debug_backtrace();
+		$trace = array_splice($backtrace, 0, 1)[0];
 		$message = $this->_build_message($trace, true);
 		$this->_push($trace, $message);
 	}
@@ -765,8 +779,8 @@ class XFileLoger {
 		foreach ($trace['args'] as $i => $arg) {
 			$arg = is_string($arg) ? $arg : utf8_json_encode($arg, $jsonopt);
 			$logs[] = preg_replace_callback("|\{(.*?)\}|", function($match) use($arg, $i){
-				if(isset($match[1]) && isset($$match[1])){
-					return $$match[1];
+				if(isset($match[1]) && isset(${$match[1]})){
+					return ${$match[1]};
 				}
 				return $match[0];
 			}, $this->argformat);
@@ -776,8 +790,8 @@ class XFileLoger {
 		$vars = compact("date","sep","file","line","method","host","uri","url","clientip","useragent","logs");
 		$message = preg_replace_callback("|\{(.*?)\}|", function($match) use($vars){
 			extract($vars);
-			if(isset($match[1]) && isset($$match[1])){
-				return $$match[1];
+			if(isset($match[1]) && isset(${$match[1]})){
+				return ${$match[1]};
 			}
 			return $match[0];
 		}, $this->format);
