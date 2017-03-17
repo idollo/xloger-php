@@ -285,11 +285,17 @@ class XLogerHelper {
 	public function __construct(){
 		// 线程ID参数
 		$this->_thread = $this->createThreadID();
-		$headers = function_exists("getallheaders")? getallheaders() : array();
-		if(isset($headers["xloger-thread"])){
-			$super_thread = $headers["xloger-thread"];
-		}else{
-			$super_thread =  isset($_REQUEST['xloger_thread'])?$_REQUEST['xloger_thread'] : null;
+
+		$super_thread = xloger_set_def(XLoger::$SERVER['HTTP_XLOGER_THREAD'], null);
+		if(!$super_thread && isset($_REQUEST['xloger_thread'])){
+			$super_thread = $_REQUEST['xloger_thread'];
+		}
+		if(!$super_thread){
+			$super_thread = xloger_set_def(XLoger::$SERVER['HTTP_CONSOLE_THREAD'], null);
+		}
+		// 兼容console_thread参数
+		if(!$super_thread && isset($_REQUEST['console_thread'])){
+			$super_thread = $_REQUEST['console_thread'];
 		}
 		if($super_thread){
 			$this->_thread = $super_thread."_".$this->_thread;
