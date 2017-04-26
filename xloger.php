@@ -141,6 +141,9 @@ class XLoger {
 		self::$SERVER = isset($_SERVER)?$_SERVER:array();
 		self::$helper = new XLogerHelper();
 		register_shutdown_function(function(){
+			if(XLOGER_CUSTOM_ERROR & XLoger::$TRACE_LOG){
+				XLoger::try_shutdown_error();
+			}
 			XLoger::$helper->shutdown();
 		});
 	}
@@ -186,11 +189,11 @@ class XLoger {
 		return xloger_set_def(XLoger::$SERVER[$name], $default );
 	}
 	/**
-	 * 致命错误
+	 * 由错误导致的shutdown
 	 */
-	public static function fatal_handler(){
+	public static function try_shutdown_error(){
 		$error = error_get_last();
-		self::error_handler($error['type'], $error['message'], $error['file'], $error['line']);
+		if($error){ self::error_handler($error['type'], $error['message'], $error['file'], $error['line']); }
 	}
 
 	/**
