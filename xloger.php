@@ -474,18 +474,18 @@ class XLogerHelper {
 	    return null;
 	}
 
-	protected $socket_started = False;
+	protected static $socket_started = False;
 	// 取得socket连接对象
 	protected static function socket(){
 		static $socket;
 
-		if($this->socket_started){
+		if(self::$socket_started){
 			while (!isset($socket) || !is_resource($socket)) {
 				# blocking...
 			}
 			return $socket;
 		}
-		$this->socket_started = True;
+		self::$socket_started = True;
 
 		if( ($socket = @socket_create(AF_INET, SOCK_STREAM, 0)) === false) {
 			$socket = false;
@@ -636,7 +636,7 @@ class XLogerHelper {
 	private function _socket_close(){
 		$socket = self::socket();
 		$socket && @socket_close($socket);
-		$this->socket_started = False;
+		self::$socket_started = False;
 	}
 
 
