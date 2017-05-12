@@ -475,21 +475,21 @@ class XLogerHelper {
 	}
 
 	protected static $socket_started = False;
+	protected static $socket_instance;
 	// 取得socket连接对象
 	protected static function socket(){
-		static $socket;
-
 		if(self::$socket_started){
-			while (!isset($socket) || !is_resource($socket)) {
-				# blocking...
+			while (!isset(self::$socket_instance) || !is_resource(self::$socket_instance)) {
+				// blocking....
 			}
-			return $socket;
+			return self::$socket_instance;
 		}
 		self::$socket_started = True;
 
 		if( ($socket = @socket_create(AF_INET, SOCK_STREAM, 0)) === false) {
 			$socket = false;
 		}
+		self::$socket_instance = &$socket;
 		if(is_resource($socket)){
 			// switch to non-blocking
 			if(!XLOGER_BLOCK_SOCKET_ON_CONNECT){
@@ -518,7 +518,7 @@ class XLogerHelper {
 			    if($sleept < 5){ $sleept++; }
 			}
 		}
-		return $socket;
+		return self::$socket_instance;
 	}
 
 
