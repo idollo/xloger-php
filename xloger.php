@@ -480,7 +480,7 @@ class XLogerHelper {
 	protected static function socket(){
 		if(self::$socket_started){
 			while (!isset(self::$socket_instance) || !is_resource(self::$socket_instance)) {
-				// blocking....
+				usleep(1);
 			}
 			return self::$socket_instance;
 		}
