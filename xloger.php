@@ -477,7 +477,7 @@ class XLogerHelper {
 	// 取得socket连接对象
 	protected static function socket(){
 		static $socket;
-		if(isset($socket)) return $socket;
+		if(isset($socket) && is_resource($socket)) return $socket;
 		if( ($socket = @socket_create(AF_INET, SOCK_STREAM, 0)) === false) {
 			$socket = false;
 		}
@@ -638,7 +638,7 @@ class XLogerHelper {
 		$stream = @json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )."\n";
 		$socket = self::socket();
 		if($socket===false) return;
-		@socket_set_block($socket);
+		@socket_set_nonblock($socket);
 		@socket_write($socket, $stream, strlen($stream));
 	}
 
