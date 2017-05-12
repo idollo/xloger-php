@@ -415,7 +415,7 @@ class XLogerHelper {
 		$this->trace( "sqlquery", $data );
 		if($data['error']){
 			$this->trace('error', array_merge($data, array(
-				"message"=> "{$data['error']} when SQL Excute[{$data['query']}]"
+				"message"=> "{$data['error']} with SQL [ {$data['query']} ]"
 			)));
 		}
 		return;
