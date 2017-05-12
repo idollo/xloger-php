@@ -474,10 +474,19 @@ class XLogerHelper {
 	    return null;
 	}
 
+	protected $socket_started = False;
 	// 取得socket连接对象
 	protected static function socket(){
 		static $socket;
-		if(isset($socket) && is_resource($socket)) return $socket;
+
+		if($this->socket_started){
+			while (!isset($socket) || !is_resource($socket)) {
+				# blocking...
+			}
+			return $socket;
+		}
+		$this->socket_started = True;
+
 		if( ($socket = @socket_create(AF_INET, SOCK_STREAM, 0)) === false) {
 			$socket = false;
 		}
@@ -611,9 +620,8 @@ class XLogerHelper {
 
 	// 线程结束
 	private function _traceThreadEnd(){
-		$socket = self::socket();
 		if(!$this->_watched) {
-			$socket && @socket_close($socket);
+			$this->_socket_close();
 			return;
 		}
 		$this->publish( "trace", array(
@@ -622,7 +630,13 @@ class XLogerHelper {
 			"timestamp" => time(),
 			"duration" => microtime(true) - $this->requestTime
 		));
+		$this->_socket_close();
+	}
+
+	private function _socket_close(){
+		$socket = self::socket();
 		$socket && @socket_close($socket);
+		$this->socket_started = False;
 	}
 
 
