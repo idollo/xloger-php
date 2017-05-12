@@ -412,12 +412,13 @@ class XLogerHelper {
 		if( !(XLoger::$TRACE_LOG & XLOGER_CUSTOM_SQL) || !$sqltrace instanceof XLogerSqlQueryTrace){return;}
 		if(!$this->_watched) return; 
 		$data = $sqltrace->traceData();
+		$this->trace( "sqlquery", $data )
 		if($data['error']){
-			$this->trace('sqlerror', array_merge($data, array(
-				"message"=> "{$data['error']} With [{$data['query']}]"
+			$this->trace('error', array_merge($data, array(
+				"message"=> "{$data['error']} when SQL Excute[{$data['query']}]"
 			)));
 		}
-		return $this->trace( "sqlquery", $data );
+		return;
 	}
 
 	/**
