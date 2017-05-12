@@ -412,12 +412,13 @@ class XLogerHelper {
 		if( !(XLoger::$TRACE_LOG & XLOGER_CUSTOM_SQL) || !$sqltrace instanceof XLogerSqlQueryTrace){return;}
 		if(!$this->_watched) return; 
 		$data = $sqltrace->traceData();
+		$this->trace( "sqlquery", $data );
 		if($data['error']){
 			$this->trace('error', array_merge($data, array(
 				"message"=> "{$data['error']} when SQL Excute[{$data['query']}]"
 			)));
 		}
-		return $this->trace( "sqlquery", $data );
+		return;
 	}
 
 	/**
@@ -637,7 +638,7 @@ class XLogerHelper {
 		$stream = @json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )."\n";
 		$socket = self::socket();
 		if($socket===false) return;
-		@socket_set_nonblock($socket);
+		@socket_set_block($socket);
 		@socket_write($socket, $stream, strlen($stream));
 	}
 
