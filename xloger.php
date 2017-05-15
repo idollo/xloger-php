@@ -50,7 +50,7 @@ if(!defined("XLOGER_SERVER_PORT")){ define("XLOGER_SERVER_PORT", 19527 ); }
 # 堵塞连接会产生长延时, 从而导致PHP脚本堵塞, 若php脚本和XLOGER_SERVER不在同一台服务上, 建议使用异步
 # 而设置异步超时XLOGER_SOCKET_CONNECT_TIMEOUT, 如果XLOGER_SERVER挂了, 便会超时跳过, 不进一步影响PHP的脚本执行
 # 本脚本和XLOGER_SERVER安装在同一台主机上, 可考虑使用堵塞
-if(!defined("XLOGER_BLOCK_SOCKET_ON_CONNECT")){ define("XLOGER_BLOCK_SOCKET_ON_CONNECT", 0 ); }
+if(!defined("XLOGER_BLOCK_SOCKET_ON_CONNECT")){ define("XLOGER_BLOCK_SOCKET_ON_CONNECT", 1 ); }
 # Socket handshake timeout: ms
 # 推荐本脚本主机到XLOGER_SERVER的平均ping值2倍即可
 if(!defined("XLOGER_SOCKET_CONNECT_TIMEOUT")){ define("XLOGER_SOCKET_CONNECT_TIMEOUT", 10 ); }
