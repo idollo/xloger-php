@@ -141,6 +141,9 @@ class XLoger {
 		self::$SERVER = isset($_SERVER)?$_SERVER:array();
 		self::$helper = new XLogerHelper();
 		register_shutdown_function(function(){
+			if(XLOGER_CUSTOM_ERROR & XLoger::$TRACE_LOG){
+				XLoger::try_shutdown_error();
+			}
 			XLoger::$helper->shutdown();
 		});
 	}
@@ -186,11 +189,11 @@ class XLoger {
 		return xloger_set_def(XLoger::$SERVER[$name], $default );
 	}
 	/**
-	 * 致命错误
+	 * 由错误导致的shutdown
 	 */
-	public static function fatal_handler(){
+	public static function try_shutdown_error(){
 		$error = error_get_last();
-		self::error_handler($error['type'], $error['message'], $error['file'], $error['line']);
+		if($error){ self::error_handler($error['type'], $error['message'], $error['file'], $error['line']); }
 	}
 
 	/**
@@ -409,12 +412,13 @@ class XLogerHelper {
 		if( !(XLoger::$TRACE_LOG & XLOGER_CUSTOM_SQL) || !$sqltrace instanceof XLogerSqlQueryTrace){return;}
 		if(!$this->_watched) return; 
 		$data = $sqltrace->traceData();
+		$this->trace( "sqlquery", $data );
 		if($data['error']){
-			$this->trace('sqlerror', array_merge($data, array(
-				"message"=> "{$data['error']} With [{$data['query']}]"
+			$this->trace('error', array_merge($data, array(
+				"message"=> "{$data['error']} with SQL {$data['query']}"
 			)));
 		}
-		return $this->trace( "sqlquery", $data );
+		return;
 	}
 
 	/**
@@ -473,7 +477,9 @@ class XLogerHelper {
 	// 取得socket连接对象
 	protected static function socket(){
 		static $socket;
-		if(isset($socket)) return $socket;
+
+		if(isset($socket) && is_resource($socket)){ return $socket; }
+
 		if( ($socket = @socket_create(AF_INET, SOCK_STREAM, 0)) === false) {
 			$socket = false;
 		}
@@ -607,9 +613,8 @@ class XLogerHelper {
 
 	// 线程结束
 	private function _traceThreadEnd(){
-		$socket = self::socket();
 		if(!$this->_watched) {
-			$socket && @socket_close($socket);
+			$this->_socket_close();
 			return;
 		}
 		$this->publish( "trace", array(
@@ -618,6 +623,11 @@ class XLogerHelper {
 			"timestamp" => time(),
 			"duration" => microtime(true) - $this->requestTime
 		));
+		$this->_socket_close();
+	}
+
+	private function _socket_close(){
+		$socket = self::socket();
 		$socket && @socket_close($socket);
 	}
 
