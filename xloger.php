@@ -725,11 +725,11 @@ class XLogerSqlQueryTrace {
 
 
 /**
- * FileLoger
+ * FileLogger
  * 全局关闭文件日志
  * define("X_FILE_LOGER_DISABLED", true);
  */
-class XFileLoger {
+class XFileLogger {
 	protected	$_logfile;
 	public	$date_format = "Y-m-d H:i:s";
 	public	$sep = "\n---\n";
@@ -750,6 +750,10 @@ class XFileLoger {
 		$this->_push($trace, $message);
 	}
 
+	/**
+	 * Readable logging
+	 * 带缩进换行格式化输出日志中的json数据, 增强可读性
+	 */
 	public function logr(){
 		if($this->_disabled()) return;
 		$backtrace = debug_backtrace();
@@ -808,6 +812,8 @@ class XFileLoger {
 		return $message;
 	}
 }
+class XFileLoger extends XFileLogger {}
+
 
 // Fetch the Command Line args
 if(isset($argv)){
